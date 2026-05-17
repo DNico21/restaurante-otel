@@ -1,0 +1,113 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # El collector también se auto-monitorea
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "otel-collector"
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["0.0.0.0:8888"]
+
+processors:
+  # Batch asíncrono: agrupa spans/metrics/logs antes de exportar
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Agrega atributos de recurso útiles para SRE
+  resource:
+    attributes:
+      - key: collector.version
+        value: "0.96.0"
+        action: insert
+      - key: environment
+        value: "development"
+        action: upsert
+
+  # Filtra métricas de baja cardinalidad para evitar explosión de series
+  filter/drop_unwanted:
+    metrics:
+      exclude:
+        match_type: regexp
+        metric_names:
+          - ".*_bucket"  # evitar duplicados, Prometheus maneja histogramas
+
+  # Memoria limitada para evitar OOM (buena práctica SRE)
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+exporters:
+  # Jaeger para trazas distribuidas
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Prometheus para métricas (pull)
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: "restaurant"
+    const_labels:
+      environment: "development"
+    send_timestamps: true
+    metric_expiration: 180m
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Debug local (stdout) para desarrollo
+  debug:
+    verbosity: normal
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # OTLP hacia Jaeger para trazas (alternativo a jaeger exporter nativo)
+  otlphttp/traces:
+    endpoint: "http://jaeger:4318"
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: 0.0.0.0:1777
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+  pipelines:
+    # Pipeline de trazas — asíncrono con batch processor
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp/jaeger, debug]
+
+    # Pipeline de métricas — asíncrono con batch processor
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus, debug]
+
+    # Pipeline de logs — asíncrono con batch processor
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug]
+
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: 0.0.0.0:8888

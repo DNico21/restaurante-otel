@@ -1,0 +1,45 @@
+# Claude Code
+.claude/
+
+# Reportes de Newman
+reports/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Base de datos SQLite local
+*.db
+*.sqlite3
+
+# Docker
+.docker/
+
+# Variables de entorno y secretos
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

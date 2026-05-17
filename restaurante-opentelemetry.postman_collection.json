@@ -1,0 +1,732 @@
+{
+  "info": {
+    "name": "Restaurante - OpenTelemetry",
+    "description": "Colección completa para el taller de OpenTelemetry en arquitectura de microservicios de restaurante.\n\nFlujo: Cliente → order-service → kitchen-service\n\nServicios:\n- order-service: http://localhost:8000\n- kitchen-service: http://localhost:8001",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "order_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "kitchen_url",
+      "value": "http://localhost:8001",
+      "type": "string"
+    },
+    {
+      "key": "last_order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Checks",
+      "item": [
+        {
+          "name": "Health - order-service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{order_url}}/health",
+              "host": ["{{order_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verifica que el order-service esté corriendo."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Service OK', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "  pm.expect(body.service).to.eql('order-service');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health - kitchen-service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kitchen_url}}/health",
+              "host": ["{{kitchen_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verifica que el kitchen-service esté corriendo."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Service OK', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "  pm.expect(body.service).to.eql('kitchen-service');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Menú",
+      "item": [
+        {
+          "name": "GET Menú",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{order_url}}/menu",
+              "host": ["{{order_url}}"],
+              "path": ["menu"]
+            },
+            "description": "Retorna el menú completo con precios en COP. Genera un span manual `menu.get`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tiene menu y currency', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('menu');",
+                  "  pm.expect(body.currency).to.eql('COP');",
+                  "});",
+                  "pm.test('Platos esperados', () => {",
+                  "  const menu = pm.response.json().menu;",
+                  "  ['hamburguesa','pizza','ensalada','pasta','sopa'].forEach(p => {",
+                  "    pm.expect(menu).to.have.property(p);",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Órdenes - Casos Exitosos",
+      "item": [
+        {
+          "name": "Crear Orden - Un plato",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Carlos Perez\",\n  \"table_number\": 3,\n  \"items\": [\"hamburguesa\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Crea una orden con un solo plato.\n\nGenera spans:\n- order.create (order-service)\n- order.validate (span manual)\n- order.call_kitchen (span cliente HTTP)\n- kitchen.check (kitchen-service)\n- kitchen.db.query_history\n- kitchen.db.query_popular\n- kitchen.db.save_order\n\nTodo con el MISMO traceId."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Orden aceptada', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('accepted');",
+                  "  pm.expect(body.order_id).to.match(/^ORD-/);",
+                  "  pm.expect(body.total_cop).to.eql(25000);",
+                  "  pm.collectionVariables.set('last_order_id', body.order_id);",
+                  "});",
+                  "pm.test('kitchen_response presente', () => {",
+                  "  const k = pm.response.json().kitchen_response;",
+                  "  pm.expect(k).to.have.property('previous_orders_count');",
+                  "  pm.expect(k).to.have.property('estimated_prep_minutes');",
+                  "  pm.expect(k.popular_items).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear Orden - Varios platos",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Maria Lopez\",\n  \"table_number\": 5,\n  \"items\": [\"pizza\", \"ensalada\", \"sopa\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Orden con 3 platos. Verifica cálculo de total: pizza(32000) + ensalada(18000) + sopa(15000) = 65000 COP."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Total correcto (65000 COP)', () => {",
+                  "  pm.expect(pm.response.json().total_cop).to.eql(65000);",
+                  "});",
+                  "pm.test('Tiempo de preparacion mayor por mas platos', () => {",
+                  "  const prep = pm.response.json().kitchen_response.estimated_prep_minutes;",
+                  "  pm.expect(prep).to.be.above(10);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear Orden - Cliente recurrente",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Carlos Perez\",\n  \"table_number\": 3,\n  \"items\": [\"pasta\", \"sopa\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Misma persona que la primera orden. kitchen-service detectará órdenes previas y el campo `customer_is_returning` será true."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cliente recurrente detectado', () => {",
+                  "  const k = pm.response.json().kitchen_response;",
+                  "  pm.expect(k.customer_is_returning).to.be.true;",
+                  "  pm.expect(k.previous_orders_count).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear Orden - Mesa VIP (tabla alta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Juan Rodriguez\",\n  \"table_number\": 10,\n  \"items\": [\"hamburguesa\", \"pizza\", \"pasta\", \"ensalada\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Orden grande (4 platos) — útil para ver latencia más alta en Jaeger."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Total correcto (103000 COP)', () => {",
+                  "  pm.expect(pm.response.json().total_cop).to.eql(103000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Órdenes - Casos de Error",
+      "item": [
+        {
+          "name": "Error - Item no existe en menu",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Cliente Error\",\n  \"table_number\": 99,\n  \"items\": [\"sushi\", \"tacos\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Items fuera del menú → HTTP 400.\n\nEn Jaeger verás el span `order.validate` marcado con StatusCode.ERROR (color rojo). Este span es visible para responder: ¿Cuál span falló?"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensaje de error descriptivo', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.detail).to.include('no disponibles en el men');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error - Lista de items vacia",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Cliente Vacio\",\n  \"table_number\": 2,\n  \"items\": []\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Lista de items vacía — el total sería 0 pero la validación lo permite (ejercicio: puedes agregar validación mínima)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta recibida', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error - Payload incompleto (sin items)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Sin Items\",\n  \"table_number\": 1\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Falta el campo obligatorio `items` → FastAPI retorna 422 Unprocessable Entity."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 - Validation Error', () => pm.response.to.have.status(422));",
+                  "pm.test('Error de validacion en campo items', () => {",
+                  "  const detail = pm.response.json().detail;",
+                  "  pm.expect(detail).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error - Mezcla validos e invalidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Ana Garcia\",\n  \"table_number\": 4,\n  \"items\": [\"hamburguesa\", \"ramen\", \"pizza\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "2 items válidos + 1 inválido (`ramen`). El servicio rechaza toda la orden si hay cualquier item no disponible."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Identifica el item invalido', () => {",
+                  "  pm.expect(pm.response.json().detail).to.include('ramen');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Kitchen Service Directo",
+      "item": [
+        {
+          "name": "Kitchen - Check directo",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ORD-TEST-DIRECTO-001\",\n  \"customer_name\": \"Test Directo\",\n  \"table_number\": 7,\n  \"items\": [\"pizza\", \"pasta\"]\n}"
+            },
+            "url": {
+              "raw": "{{kitchen_url}}/kitchen/check",
+              "host": ["{{kitchen_url}}"],
+              "path": ["kitchen", "check"]
+            },
+            "description": "Llama directamente al kitchen-service sin pasar por order-service.\n\nNOTA: Este request NO tendrá propagación de contexto desde order-service. En Jaeger aparecerá como una traza independiente (sin el span padre de order-service)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Respuesta completa de cocina', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('order_id');",
+                  "  pm.expect(body).to.have.property('previous_orders_count');",
+                  "  pm.expect(body).to.have.property('estimated_prep_minutes');",
+                  "  pm.expect(body).to.have.property('popular_items');",
+                  "  pm.expect(body).to.have.property('customer_is_returning');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kitchen - Estadisticas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kitchen_url}}/kitchen/stats",
+              "host": ["{{kitchen_url}}"],
+              "path": ["kitchen", "stats"]
+            },
+            "description": "Retorna estadísticas de la base de datos SQLite:\n- Total de órdenes registradas\n- Top 5 clientes por frecuencia\n\nResuelve la pregunta del taller: ¿Cuál endpoint tiene más errores? (aquí puedes ver el historial)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Estadisticas presentes', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('total_orders');",
+                  "  pm.expect(body.total_orders).to.be.above(0);",
+                  "  pm.expect(body.top_customers).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Carga de Trafico (Runner)",
+      "item": [
+        {
+          "name": "Carga - Hamburguesa mesa 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Cliente A\",\n  \"table_number\": 1,\n  \"items\": [\"hamburguesa\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Usar con Collection Runner (iteraciones: 10, delay: 200ms) para generar tráfico y ver métricas RPS y percentil p95 en Grafana."
+          },
+          "response": []
+        },
+        {
+          "name": "Carga - Pizza mesa 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Cliente B\",\n  \"table_number\": 2,\n  \"items\": [\"pizza\", \"ensalada\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Usar con Collection Runner para generar tráfico mixto."
+          },
+          "response": []
+        },
+        {
+          "name": "Carga - Orden grande mesa 3",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Cliente C\",\n  \"table_number\": 3,\n  \"items\": [\"hamburguesa\", \"pizza\", \"pasta\", \"ensalada\", \"sopa\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Orden con 5 platos (máximo del menú). Genera mayor latencia y ticket más alto — útil para el histograma de `restaurant.order.value`."
+          },
+          "response": []
+        },
+        {
+          "name": "Carga - Error intencional",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Cliente Error\",\n  \"table_number\": 9,\n  \"items\": [\"item_inexistente\"]\n}"
+            },
+            "url": {
+              "raw": "{{order_url}}/orders",
+              "host": ["{{order_url}}"],
+              "path": ["orders"]
+            },
+            "description": "Error intencional para incrementar el contador `restaurant.orders.failed` y la tasa de error en Grafana."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Observabilidad - Links utiles",
+      "item": [
+        {
+          "name": "Jaeger - UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:16686",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "16686"
+            },
+            "description": "Interfaz web de Jaeger para ver trazas distribuidas.\n\nBuscar servicio: order-service o kitchen-service\nResponde: ¿Dónde inició el request? ¿Cuál span falló? ¿Cuál servicio tardó más?"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Jaeger accesible', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grafana - Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "health"]
+            },
+            "description": "Health de Grafana.\nCredenciales UI: admin / admin\n\nResuelve: RPS, p95, tasa de error, métricas custom (valor COP por orden, platos populares)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Grafana accesible', () => pm.response.to.have.status(200));",
+                  "pm.test('Grafana OK', () => {",
+                  "  pm.expect(pm.response.json().database).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prometheus - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:9090/-/healthy",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "9090",
+              "path": ["-", "healthy"]
+            },
+            "description": "Health check de Prometheus."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Prometheus saludable', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "OTel Collector - zPages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:55679/debug/tracez",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "55679",
+              "path": ["debug", "tracez"]
+            },
+            "description": "Debug UI del OTel Collector para ver spans en tránsito, pipelines activos y estado del batch processor."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('zPages accesible', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "OTel Collector - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:13133",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "13133"
+            },
+            "description": "Health check del OTel Collector."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('OTel Collector saludable', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
