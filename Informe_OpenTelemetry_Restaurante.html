@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Implementación OpenTelemetry – Restaurante</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a1a; background: #fff; line-height: 1.6; }
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 60px; }
+
+  h1 { font-size: 22pt; color: #1a3a5c; border-bottom: 3px solid #1a3a5c; padding-bottom: 8px; margin-bottom: 6px; }
+  h2 { font-size: 15pt; color: #1a3a5c; border-left: 5px solid #2196F3; padding-left: 10px; margin: 32px 0 12px; }
+  h3 { font-size: 12pt; color: #2c5282; margin: 20px 0 8px; }
+  h4 { font-size: 11pt; color: #2d3748; margin: 14px 0 6px; }
+
+  p { margin-bottom: 10px; text-align: justify; }
+  ul, ol { margin: 8px 0 12px 24px; }
+  li { margin-bottom: 4px; }
+
+  pre {
+    background: #1e2533;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-size: 9.5pt;
+    font-family: 'Consolas', 'Courier New', monospace;
+    overflow-x: auto;
+    margin: 10px 0 16px;
+    line-height: 1.5;
+  }
+  code {
+    background: #eef2ff;
+    color: #3730a3;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 9.5pt;
+  }
+  pre code { background: none; color: inherit; padding: 0; border-radius: 0; }
+
+  .keyword { color: #93c5fd; }
+  .string  { color: #86efac; }
+  .comment { color: #6b7280; font-style: italic; }
+  .func    { color: #fde68a; }
+  .type    { color: #f9a8d4; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 10pt; }
+  th { background: #1a3a5c; color: #fff; padding: 8px 12px; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) td { background: #f7fafc; }
+
+  .callout {
+    border-left: 4px solid #2196F3;
+    background: #e3f2fd;
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout.green  { border-color: #4caf50; background: #e8f5e9; }
+  .callout.orange { border-color: #ff9800; background: #fff3e0; }
+  .callout.red    { border-color: #f44336; background: #ffebee; }
+
+  .answer-box {
+    border: 2px solid #1a3a5c;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+    background: #f0f7ff;
+  }
+  .answer-box .q { font-weight: bold; color: #1a3a5c; margin-bottom: 6px; }
+  .answer-box .a { color: #2d3748; }
+
+  .cover { text-align: center; padding: 60px 0 40px; border-bottom: 2px solid #e2e8f0; margin-bottom: 40px; }
+  .cover h1 { border: none; font-size: 26pt; }
+  .cover .subtitle { font-size: 14pt; color: #4a5568; margin: 10px 0; }
+  .cover .meta { font-size: 10pt; color: #718096; margin-top: 20px; line-height: 2; }
+
+  .toc { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px 28px; margin: 20px 0 36px; }
+  .toc h3 { color: #1a3a5c; margin-bottom: 10px; }
+  .toc ol { margin-left: 18px; }
+  .toc li { margin-bottom: 3px; }
+
+  .arch-diagram {
+    background: #1e2533;
+    color: #e2e8f0;
+    font-family: 'Consolas', monospace;
+    font-size: 10pt;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 14px 0;
+    line-height: 1.8;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 8.5pt;
+    font-weight: bold;
+    margin-left: 6px;
+  }
+  .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+  .badge-green  { background: #dcfce7; color: #15803d; }
+  .badge-orange { background: #ffedd5; color: #c2410c; }
+
+  @media print {
+    body { font-size: 10pt; }
+    .page { padding: 20px 40px; }
+    pre { font-size: 8.5pt; }
+    h2 { page-break-before: auto; }
+    .answer-box { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- PORTADA -->
+<div class="cover">
+  <h1>Implementación de OpenTelemetry</h1>
+  <div class="subtitle">Arquitectura de Microservicios – Plataforma de Restaurante</div>
+  <div class="subtitle" style="font-size:12pt;color:#2196F3;">order-service &nbsp;→&nbsp; kitchen-service</div>
+  <div class="meta">
+    Asignatura: Patrones de Diseño / SRE<br>
+    Tecnología: Python · FastAPI · OpenTelemetry · Docker<br>
+    Herramientas: Jaeger · Prometheus · Grafana · OTel Collector
+  </div>
+</div>
+
+<!-- TABLA DE CONTENIDOS -->
+<div class="toc">
+  <h3>Tabla de Contenidos</h3>
+  <ol>
+    <li>Arquitectura del sistema</li>
+    <li>Instrumentación automática</li>
+    <li>Instrumentación manual</li>
+    <li>Propagación de contexto</li>
+    <li>Correlación logs-traces</li>
+    <li>Métricas HTTP</li>
+    <li>Métricas custom</li>
+    <li>Exportación OTLP</li>
+    <li>Collector asíncrono</li>
+    <li>Visualización en Jaeger</li>
+    <li>Visualización en Grafana</li>
+    <li>Manejo de errores y spans</li>
+    <li>Buenas prácticas SRE</li>
+    <li>Respuestas a las preguntas del ejercicio</li>
+  </ol>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>1. Arquitectura del Sistema</h2>
+
+<p>La plataforma implementa un sistema de órdenes de restaurante compuesto por dos microservicios que se comunican de forma síncrona. Todo el flujo queda instrumentado de extremo a extremo con OpenTelemetry.</p>
+
+<div class="arch-diagram">
+Cliente (HTTP / Postman / Newman)
+         │
+         │  POST /orders
+         ▼
+┌─────────────────────────┐
+│     order-service       │  Puerto 8000
+│  (xxx-service del PDF)  │
+│                         │
+│  1. Recibe la petición  │
+│  2. Valida ítems menú   │
+│  3. Calcula total COP   │
+│  4. Llama kitchen →     │
+└──────────┬──────────────┘
+           │  POST /kitchen/check
+           │  (con W3C TraceContext propagado)
+           ▼
+┌─────────────────────────┐
+│    kitchen-service      │  Puerto 8001
+│  (yyy-service del PDF)  │
+│                         │
+│  1. Consulta historial  │
+│     del cliente (SQLite)│
+│  2. Busca platos        │
+│     populares           │
+│  3. Guarda la orden     │
+└─────────────────────────┘
+           │
+           │  OTLP gRPC (ambos servicios)
+           ▼
+┌─────────────────────────┐
+│    OTel Collector       │  (asíncrono / BatchProcessor)
+│                         │
+│  Pipelines separados:   │
+│  traces → Jaeger        │
+│  metrics → Prometheus   │
+│  logs → stdout          │
+└─────────────────────────┘
+</div>
+
+<h3>Stack tecnológico</h3>
+<table>
+  <tr><th>Componente</th><th>Tecnología</th><th>Puerto</th></tr>
+  <tr><td>order-service</td><td>Python 3.11 + FastAPI + OpenTelemetry SDK</td><td>8000</td></tr>
+  <tr><td>kitchen-service</td><td>Python 3.11 + FastAPI + SQLite + OpenTelemetry SDK</td><td>8001</td></tr>
+  <tr><td>OTel Collector</td><td>otel/opentelemetry-collector-contrib:0.96.0</td><td>4317 / 4318</td></tr>
+  <tr><td>Jaeger</td><td>jaegertracing/all-in-one:1.55</td><td>16686</td></tr>
+  <tr><td>Prometheus</td><td>prom/prometheus:v2.50.1</td><td>9090</td></tr>
+  <tr><td>Grafana</td><td>grafana/grafana:10.3.3</td><td>3000</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>2. Instrumentación Automática</h2>
+
+<p>La instrumentación automática captura spans sin modificar la lógica del negocio, usando librerías que interceptan el framework HTTP y el cliente de base de datos.</p>
+
+<h3>Librerías usadas (requirements.txt)</h3>
+<pre><code>opentelemetry-instrumentation-fastapi==0.45b0   <span class="comment"># HTTP server automático</span>
+opentelemetry-instrumentation-httpx==0.45b0     <span class="comment"># HTTP client automático</span>
+opentelemetry-instrumentation-sqlite3==0.45b0   <span class="comment"># Base de datos automática</span>
+opentelemetry-instrumentation-logging==0.45b0   <span class="comment"># Logs automáticos</span></code></pre>
+
+<h3>Activación en order-service (main.py)</h3>
+<pre><code><span class="comment"># Instrumenta FastAPI automáticamente: captura método, ruta, status code</span>
+FastAPIInstrumentor.instrument_app(app)
+
+<span class="comment"># Instrumenta httpx: propaga el contexto al llamar a kitchen-service</span>
+HTTPXClientInstrumentor().instrument()</code></pre>
+
+<h3>Activación en kitchen-service (main.py)</h3>
+<pre><code><span class="comment"># Instrumenta FastAPI</span>
+FastAPIInstrumentor.instrument_app(app)
+
+<span class="comment"># Instrumenta SQLite: genera spans por cada SELECT/INSERT</span>
+SQLite3Instrumentor().instrument()</code></pre>
+
+<div class="callout green">
+  <strong>¿Qué captura automáticamente?</strong> Cada request HTTP entrante y saliente genera un span con atributos estándar: <code>http.method</code>, <code>http.route</code>, <code>http.status_code</code>, <code>http.url</code>. Las consultas SQLite generan spans con <code>db.system</code>, <code>db.statement</code>, <code>db.operation</code>.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>3. Instrumentación Manual</h2>
+
+<p>La instrumentación manual crea spans adicionales con información específica del negocio del restaurante, complementando los spans automáticos.</p>
+
+<h3>Spans manuales implementados</h3>
+<table>
+  <tr><th>Span</th><th>Servicio</th><th>Descripción</th></tr>
+  <tr><td><code>order.create</code></td><td>order-service</td><td>Span raíz de todo el flujo de una orden</td></tr>
+  <tr><td><code>order.validate</code></td><td>order-service</td><td>Valida que los ítems existan en el menú</td></tr>
+  <tr><td><code>order.call_kitchen</code></td><td>order-service</td><td>Llamada HTTP al kitchen-service</td></tr>
+  <tr><td><code>kitchen.check</code></td><td>kitchen-service</td><td>Span raíz del kitchen-service</td></tr>
+  <tr><td><code>kitchen.db.query_history</code></td><td>kitchen-service</td><td>Consulta historial del cliente en SQLite</td></tr>
+  <tr><td><code>kitchen.db.query_popular</code></td><td>kitchen-service</td><td>Consulta platos más pedidos</td></tr>
+  <tr><td><code>kitchen.db.save_order</code></td><td>kitchen-service</td><td>Inserta la nueva orden en SQLite</td></tr>
+</table>
+
+<h3>Ejemplo de span manual – validación de orden</h3>
+<pre><code><span class="comment"># order-service/main.py – función _validate_order()</span>
+<span class="keyword">def</span> <span class="func">_validate_order</span>(order, span):
+    <span class="keyword">with</span> tracer.start_as_current_span(<span class="string">"order.validate"</span>) <span class="keyword">as</span> validate_span:
+
+        <span class="comment"># Detectar ítems no disponibles</span>
+        unknown = [i <span class="keyword">for</span> i <span class="keyword">in</span> order.items <span class="keyword">if</span> i <span class="keyword">not in</span> MENU]
+        <span class="keyword">if</span> unknown:
+            validate_span.set_attribute(<span class="string">"restaurant.unknown_items"</span>, str(unknown))
+            validate_span.set_status(StatusCode.ERROR, <span class="string">f"Ítems no disponibles: {unknown}"</span>)
+            <span class="keyword">raise</span> HTTPException(status_code=<span class="type">400</span>, detail=...)
+
+        total = sum(MENU[i] <span class="keyword">for</span> i <span class="keyword">in</span> order.items)
+        order_id = <span class="string">f"ORD-{int(time.time() * 1000)}-{random.randint(100,999)}"</span>
+
+        <span class="comment"># Atributos de negocio en el span</span>
+        validate_span.set_attribute(<span class="string">"restaurant.order_id"</span>, order_id)
+        validate_span.set_attribute(<span class="string">"restaurant.total_cop"</span>, total)
+        validate_span.set_status(StatusCode.OK)
+        <span class="keyword">return</span> order_id, total</code></pre>
+
+<h3>Ejemplo de span manual – consulta DB</h3>
+<pre><code><span class="comment"># kitchen-service/main.py – función _query_customer_history()</span>
+<span class="keyword">def</span> <span class="func">_query_customer_history</span>(customer_name, parent_span):
+    <span class="keyword">with</span> tracer.start_as_current_span(
+        <span class="string">"kitchen.db.query_history"</span>,
+        attributes={
+            <span class="string">"db.system"</span>:    <span class="string">"sqlite"</span>,
+            <span class="string">"db.operation"</span>: <span class="string">"SELECT"</span>,
+            <span class="string">"db.statement"</span>: <span class="string">"SELECT COUNT(*) FROM orders WHERE customer = ?"</span>,
+        }
+    ) <span class="keyword">as</span> db_span:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(<span class="string">"SELECT COUNT(*) FROM orders WHERE customer = ?"</span>, (customer_name,))
+        count = cursor.fetchone()[<span class="type">0</span>]
+        db_span.set_attribute(<span class="string">"db.result_count"</span>, count)
+        db_span.set_status(StatusCode.OK)
+        <span class="keyword">return</span> count</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>4. Propagación de Contexto</h2>
+
+<p>La propagación de contexto es el mecanismo que permite que el mismo <code>traceId</code> viaje desde el order-service hasta el kitchen-service, uniendo ambos servicios en una sola traza distribuida.</p>
+
+<h3>¿Cómo funciona?</h3>
+<p>OpenTelemetry usa el estándar <strong>W3C TraceContext</strong>. Cuando order-service llama a kitchen-service via HTTP, el <code>HTTPXClientInstrumentor</code> inyecta automáticamente las cabeceras:</p>
+<pre><code>traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+tracestate:  (opcional)</code></pre>
+
+<p>kitchen-service recibe esas cabeceras y extrae el contexto, continuando la misma traza con el mismo <code>traceId</code>.</p>
+
+<h3>Código que habilita la propagación (order-service)</h3>
+<pre><code><span class="comment"># La instrumentación automática de httpx hace TODO el trabajo:</span>
+HTTPXClientInstrumentor().instrument()
+
+<span class="comment"># Al hacer esta llamada, httpx inyecta las cabeceras W3C automáticamente</span>
+<span class="keyword">async with</span> httpx.AsyncClient() <span class="keyword">as</span> client:
+    resp = <span class="keyword">await</span> client.post(<span class="string">f"{KITCHEN_URL}/kitchen/check"</span>, json=payload)
+<span class="comment"># → Header enviado: traceparent: 00-TRACE_ID-SPAN_ID-01</span></code></pre>
+
+<div class="callout">
+  <strong>Resultado visible en Jaeger:</strong> Al abrir cualquier traza de <code>order-service</code>, se ve el waterfall completo con spans de <em>ambos</em> servicios bajo el mismo <code>traceId</code>. Esto responde directamente: <em>"Todo debe quedar trazado de punta a punta con el mismo TraceId"</em>.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>5. Correlación Logs-Traces</h2>
+
+<p>Cada mensaje de log incluye el <code>trace_id</code> y el <code>span_id</code> activos en ese momento, permitiendo navegar directamente de un log a su traza en Jaeger.</p>
+
+<h3>Configuración (ambos servicios)</h3>
+<pre><code><span class="comment"># Activa la inyección automática de trace_id y span_id en logs</span>
+LoggingInstrumentor().instrument(set_logging_format=<span class="keyword">True</span>)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format=<span class="string">"%(asctime)s [%(levelname)s] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s] %(name)s - %(message)s"</span>,
+)</code></pre>
+
+<h3>Ejemplo de log generado</h3>
+<pre><code>2026-05-17 10:23:41 [INFO] [trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7] order-service - Orden ORD-1747478621-342 validada. Total: $57000 COP
+2026-05-17 10:23:41 [INFO] [trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=a3ce929d0e0e4736] kitchen-service - Historial de 'Maria Lopez': 3 órdenes previas</code></pre>
+
+<div class="callout green">
+  Nótese que el <code>trace_id</code> es idéntico en ambos logs aunque son de servicios distintos. Con ese ID se puede buscar directamente en Jaeger y ver toda la traza.
+</div>
+
+<h3>Cómo ver los logs correlacionados</h3>
+<pre><code><span class="comment"># Ver logs de order-service con el trace_id</span>
+docker logs order-service 2>&1 | grep trace_id
+
+<span class="comment"># Ver logs de ambos servicios para un trace_id específico</span>
+docker logs order-service 2>&1 | grep "4bf92f3577b34da6a3ce929d0e0e4736"
+docker logs kitchen-service 2>&1 | grep "4bf92f3577b34da6a3ce929d0e0e4736"</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>6. Métricas HTTP</h2>
+
+<p>Las métricas HTTP permiten responder preguntas de rendimiento: cuántas peticiones llegan, qué tan rápido responden y cuántas fallan.</p>
+
+<h3>Métricas estándar implementadas</h3>
+<table>
+  <tr><th>Nombre de métrica</th><th>Tipo</th><th>Descripción</th></tr>
+  <tr><td><code>restaurant.orders.total</code></td><td>Counter</td><td>Total de órdenes recibidas, etiquetadas por status y mesa</td></tr>
+  <tr><td><code>restaurant.orders.failed</code></td><td>Counter</td><td>Órdenes que terminaron en error</td></tr>
+  <tr><td><code>restaurant.order.duration</code></td><td>Histogram</td><td>Tiempo de procesamiento en milisegundos</td></tr>
+  <tr><td><code>restaurant.orders.active</code></td><td>UpDownCounter</td><td>Órdenes en procesamiento en este momento</td></tr>
+  <tr><td><code>restaurant.kitchen.db_queries</code></td><td>Counter</td><td>Consultas a SQLite por tipo de operación</td></tr>
+  <tr><td><code>restaurant.kitchen.db_query_duration</code></td><td>Histogram</td><td>Latencia de cada consulta a la base de datos</td></tr>
+</table>
+
+<h3>Código de las métricas HTTP (order-service/main.py)</h3>
+<pre><code>meter = metrics.get_meter(SERVICE_NAME)
+
+orders_counter = meter.create_counter(
+    <span class="string">"restaurant.orders.total"</span>,
+    description=<span class="string">"Total de órdenes recibidas"</span>,
+)
+order_duration_histogram = meter.create_histogram(
+    <span class="string">"restaurant.order.duration"</span>,
+    description=<span class="string">"Duración del procesamiento en milisegundos"</span>,
+    unit=<span class="string">"ms"</span>,
+)
+
+<span class="comment"># Registro en cada request exitoso:</span>
+orders_counter.add(<span class="type">1</span>, {<span class="string">"status"</span>: <span class="string">"success"</span>, <span class="string">"table"</span>: str(order.table_number)})
+order_duration_histogram.record(duration_ms, {<span class="string">"service"</span>: SERVICE_NAME})</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>7. Métricas Custom</h2>
+
+<p>El ejercicio exige una métrica custom más allá de las estándar. Se implementaron <strong>dos métricas propias del negocio</strong>:</p>
+
+<h3>Métrica custom 1 — Valor monetario de las órdenes</h3>
+<pre><code><span class="comment"># order-service/main.py</span>
+order_value_histogram = meter.create_histogram(
+    <span class="string">"restaurant.order.value"</span>,
+    description=<span class="string">"Valor monetario de cada orden en COP"</span>,
+    unit=<span class="string">"COP"</span>,
+)
+
+<span class="comment"># Se registra con cada orden aceptada:</span>
+order_value_histogram.record(total, {<span class="string">"table"</span>: str(order.table_number)})
+<span class="comment"># Ejemplo: record(57000, {"table": "3"})</span></code></pre>
+
+<p>Esta métrica permite calcular en Grafana el percentil p95 del ticket promedio por mesa, o el ingreso total acumulado del restaurante.</p>
+
+<p><strong>Query en Grafana/Prometheus:</strong></p>
+<pre><code><span class="comment"># Percentil p95 del valor de orden</span>
+histogram_quantile(0.95, rate(restaurant_restaurant_order_value_COP_bucket[5m]))
+
+<span class="comment"># Valor promedio por orden</span>
+rate(restaurant_restaurant_order_value_COP_sum[1m]) / rate(restaurant_restaurant_order_value_COP_count[1m])</code></pre>
+
+<h3>Métrica custom 2 — Popularidad de platos</h3>
+<pre><code><span class="comment"># kitchen-service/main.py</span>
+dish_popularity_counter = meter.create_counter(
+    <span class="string">"restaurant.kitchen.dish_requests"</span>,
+    description=<span class="string">"Conteo de solicitudes por plato (métrica custom)"</span>,
+)
+
+<span class="comment"># Se incrementa por cada plato en cada orden:</span>
+<span class="keyword">for</span> item <span class="keyword">in</span> req.items:
+    dish_popularity_counter.add(<span class="type">1</span>, {<span class="string">"dish"</span>: item})
+<span class="comment"># Ejemplo: add(1, {"dish": "pizza"}), add(1, {"dish": "pasta"})</span></code></pre>
+
+<p>Esta métrica muestra en tiempo real qué platos son los más solicitados, visible en Grafana como un gráfico de barras horizontales con label <code>dish</code>.</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>8. Exportación OTLP</h2>
+
+<p>Ambos microservicios exportan sus señales (traces, metrics) usando el protocolo OTLP sobre gRPC hacia el OTel Collector.</p>
+
+<h3>Configuración del exportador (ambos servicios)</h3>
+<pre><code>OTEL_ENDPOINT = os.getenv(<span class="string">"OTEL_EXPORTER_OTLP_ENDPOINT"</span>, <span class="string">"http://otel-collector:4317"</span>)
+
+<span class="comment"># Exportador de trazas</span>
+tracer_provider.add_span_processor(
+    BatchSpanProcessor(
+        OTLPSpanExporter(endpoint=OTEL_ENDPOINT, insecure=<span class="keyword">True</span>)
+    )
+)
+
+<span class="comment"># Exportador de métricas</span>
+metric_reader = PeriodicExportingMetricReader(
+    OTLPMetricExporter(endpoint=OTEL_ENDPOINT, insecure=<span class="keyword">True</span>),
+    export_interval_millis=<span class="type">5000</span>,  <span class="comment"># exporta cada 5 segundos</span>
+)</code></pre>
+
+<h3>Variables de entorno en Docker Compose</h3>
+<pre><code><span class="comment"># docker-compose.yml</span>
+order-service:
+  environment:
+    - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    - KITCHEN_SERVICE_URL=http://kitchen-service:8001
+
+kitchen-service:
+  environment:
+    - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>9. Collector Asíncrono</h2>
+
+<p>El OTel Collector es el componente central que recibe, procesa y enruta las señales de telemetría. Opera de forma <strong>asíncrona</strong> mediante el uso de <em>batch processors</em>, lo que evita que el envío de telemetría bloquee el procesamiento de los requests.</p>
+
+<h3>¿Por qué asíncrono?</h3>
+<p>Sin el <code>BatchSpanProcessor</code>, cada span sería exportado inmediatamente al Collector en el mismo thread del request (modo síncrono), añadiendo latencia directamente al usuario. Con el modo batch, los spans se acumulan en memoria y se envían en lotes, desacoplando la exportación del procesamiento de negocio.</p>
+
+<h3>Configuración del Batch Processor (otel-collector-config.yaml)</h3>
+<pre><code>processors:
+  <span class="comment"># Agrupa y envía en lotes — modo asíncrono</span>
+  batch:
+    timeout: 1s            <span class="comment"># máximo 1s de espera antes de enviar</span>
+    send_batch_size: 1024  <span class="comment"># envía cuando acumula 1024 spans</span>
+    send_batch_max_size: 2048
+
+  <span class="comment"># Limita uso de memoria — buena práctica SRE</span>
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512         <span class="comment"># máximo 512 MB de RAM</span>
+    spike_limit_mib: 128
+
+  <span class="comment"># Agrega metadatos a todas las señales</span>
+  resource:
+    attributes:
+      - key: environment
+        value: "development"
+        action: upsert</code></pre>
+
+<h3>Pipelines separados por tipo de señal</h3>
+<pre><code>service:
+  pipelines:
+    traces:            <span class="comment"># trazas → Jaeger</span>
+      receivers:  [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters:  [otlp/jaeger, debug]
+
+    metrics:           <span class="comment"># métricas → Prometheus</span>
+      receivers:  [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters:  [prometheus, debug]
+
+    logs:              <span class="comment"># logs → stdout</span>
+      receivers:  [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters:  [debug]</code></pre>
+
+<div class="callout orange">
+  <strong>BatchSpanProcessor también en los servicios:</strong> En el código Python, <code>BatchSpanProcessor</code> es el que encola los spans en un buffer interno y los envía al Collector en segundo plano, sin bloquear el hilo principal de FastAPI.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>10. Visualización en Jaeger</h2>
+
+<p>Jaeger es la herramienta de trazas distribuidas. Permite ver el flujo completo de un request con todos sus spans.</p>
+
+<h3>Acceso</h3>
+<pre><code>http://localhost:16686</code></pre>
+
+<h3>Cómo buscar una traza</h3>
+<ol>
+  <li>Panel izquierdo → <strong>Service</strong>: seleccionar <code>order-service</code></li>
+  <li><strong>Operation</strong>: <code>POST /orders</code></li>
+  <li>Clic en <strong>Find Traces</strong></li>
+  <li>Seleccionar cualquier traza de la lista</li>
+</ol>
+
+<h3>Vista waterfall esperada</h3>
+<pre><code>▼ order-service: order.create                      ──────────────── 35ms
+    ▼ order-service: order.validate                ──               3ms
+    ▼ order-service: order.call_kitchen            ────────────     28ms
+        ▼ kitchen-service: kitchen.check           ─────────        22ms
+            ▼ kitchen.db.query_history             ───              4ms
+            ▼ kitchen.db.query_popular             ──               3ms
+            ▼ kitchen.db.save_order                ──               2ms</code></pre>
+
+<h3>Ver spans con error</h3>
+<p>Para ver un span fallido (cuando se envían ítems que no están en el menú):</p>
+<ol>
+  <li>En el filtro <strong>Tags</strong> escribir: <code>error=true</code></li>
+  <li>Clic en <strong>Find Traces</strong></li>
+  <li>El span <code>order.validate</code> aparece en rojo</li>
+  <li>Al abrirlo se ve el atributo <code>restaurant.unknown_items</code> con los ítems inválidos</li>
+</ol>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>11. Visualización en Grafana</h2>
+
+<p>Grafana muestra las métricas en tiempo real con el dashboard pre-provisionado automáticamente al levantar el stack.</p>
+
+<h3>Acceso</h3>
+<pre><code>http://localhost:3000    →  usuario: admin  /  contraseña: admin</code></pre>
+
+<h3>Paneles del dashboard "Restaurante - OpenTelemetry"</h3>
+<table>
+  <tr><th>Panel</th><th>Query Prometheus</th><th>Responde a</th></tr>
+  <tr>
+    <td>RPS – Requests por Segundo</td>
+    <td><code>rate(restaurant_orders_total[1m])</code></td>
+    <td>¿Cuántos requests por segundo?</td>
+  </tr>
+  <tr>
+    <td>Latencia p95</td>
+    <td><code>histogram_quantile(0.95, rate(..._bucket[5m]))</code></td>
+    <td>¿Cuál es el percentil p95?</td>
+  </tr>
+  <tr>
+    <td>Total Órdenes</td>
+    <td><code>sum(restaurant_orders_total)</code></td>
+    <td>Volumen total procesado</td>
+  </tr>
+  <tr>
+    <td>Tasa de Error %</td>
+    <td><code>100 * failed / total</code></td>
+    <td>¿Cuál endpoint tiene más errores?</td>
+  </tr>
+  <tr>
+    <td>Órdenes Activas</td>
+    <td><code>sum(restaurant_orders_active)</code></td>
+    <td>Concurrencia actual</td>
+  </tr>
+  <tr>
+    <td><strong>CUSTOM: Valor COP p95</strong></td>
+    <td><code>histogram_quantile(0.95, rate(order_value_COP_bucket[5m]))</code></td>
+    <td>Ticket promedio de las órdenes</td>
+  </tr>
+  <tr>
+    <td><strong>CUSTOM: Platos populares</strong></td>
+    <td><code>sum by (dish)(kitchen_dish_requests_total)</code></td>
+    <td>¿Qué platos se piden más?</td>
+  </tr>
+  <tr>
+    <td>Latencia DB p95</td>
+    <td><code>histogram_quantile(0.95, rate(db_query_duration_bucket[5m]))</code></td>
+    <td>¿Qué operación generó latencia?</td>
+  </tr>
+  <tr>
+    <td>Memoria OTel Collector</td>
+    <td><code>otelcol_process_memory_rss</code></td>
+    <td>¿Cuál servicio consume más memoria?</td>
+  </tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>12. Manejo de Errores y Spans</h2>
+
+<p>Cuando ocurre un error, el span queda marcado con <code>StatusCode.ERROR</code> y el detalle de la excepción queda registrado dentro del span como un evento.</p>
+
+<h3>Patrón implementado en ambos servicios</h3>
+<pre><code><span class="keyword">except</span> HTTPException <span class="keyword">as</span> exc:
+    <span class="comment"># 1. Adjunta la excepción al span (stack trace incluido)</span>
+    span.record_exception(exc)
+
+    <span class="comment"># 2. Marca el span con estado ERROR y mensaje descriptivo</span>
+    span.set_status(StatusCode.ERROR, str(exc))
+
+    <span class="comment"># 3. Incrementa el contador de errores</span>
+    orders_failed_counter.add(<span class="type">1</span>, {<span class="string">"table"</span>: str(order.table_number)})
+
+    <span class="comment"># 4. Log correlacionado con el trace_id activo</span>
+    logger.error(<span class="string">"Error procesando orden de %s: %s"</span>, order.customer_name, exc)
+    <span class="keyword">raise</span></code></pre>
+
+<h3>Tipos de error manejados</h3>
+<table>
+  <tr><th>Escenario</th><th>HTTP Status</th><th>Span afectado</th></tr>
+  <tr><td>Ítem no disponible en el menú</td><td>400</td><td><code>order.validate</code></td></tr>
+  <tr><td>Payload incompleto (sin campo <code>items</code>)</td><td>422</td><td>Automático FastAPI</td></tr>
+  <tr><td>kitchen-service no disponible</td><td>500</td><td><code>order.call_kitchen</code></td></tr>
+  <tr><td>Error en consulta SQLite</td><td>500</td><td><code>kitchen.db.*</code></td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>13. Buenas Prácticas SRE</h2>
+
+<p>El sistema implementa las siguientes prácticas recomendadas para Site Reliability Engineering:</p>
+
+<table>
+  <tr><th>Práctica</th><th>Implementación</th></tr>
+  <tr>
+    <td>Exportación asíncrona</td>
+    <td><code>BatchSpanProcessor</code> y <code>PeriodicExportingMetricReader</code> — nunca bloquean el request</td>
+  </tr>
+  <tr>
+    <td>Límite de memoria</td>
+    <td>Collector con <code>memory_limiter</code> (512 MiB) para evitar OOM</td>
+  </tr>
+  <tr>
+    <td>Health checks</td>
+    <td>Todos los contenedores tienen <code>healthcheck</code> en Docker Compose</td>
+  </tr>
+  <tr>
+    <td>Separación de señales</td>
+    <td>Pipelines independientes para traces, metrics y logs en el Collector</td>
+  </tr>
+  <tr>
+    <td>Atributos semánticos</td>
+    <td>Uso de <code>SpanAttributes</code> estándar (<code>http.method</code>, <code>db.system</code>)</td>
+  </tr>
+  <tr>
+    <td>Logs estructurados</td>
+    <td>Formato JSON-like con <code>trace_id</code> y <code>span_id</code> en cada línea</td>
+  </tr>
+  <tr>
+    <td>Recursos declarados</td>
+    <td><code>service.name</code>, <code>service.version</code>, <code>deployment.environment</code> en el Resource</td>
+  </tr>
+  <tr>
+    <td>Retención configurada</td>
+    <td>Prometheus con retención de 7 días (<code>--storage.tsdb.retention.time=7d</code>)</td>
+  </tr>
+  <tr>
+    <td>Reinicio automático</td>
+    <td><code>restart: unless-stopped</code> en todos los servicios</td>
+  </tr>
+</table>
+
+<h3>Ejemplo: Resource con metadatos del servicio</h3>
+<pre><code>resource = Resource.create({
+    <span class="string">"service.name"</span>:           <span class="string">"order-service"</span>,
+    <span class="string">"service.version"</span>:        <span class="string">"1.0.0"</span>,
+    <span class="string">"deployment.environment"</span>: <span class="string">"development"</span>,
+    <span class="string">"service.namespace"</span>:      <span class="string">"restaurante"</span>,
+})</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>14. Respuestas a las Preguntas del Ejercicio</h2>
+
+<div class="answer-box">
+  <div class="q">¿Dónde inició el request?</div>
+  <div class="a">
+    En <strong>Jaeger</strong>: el primer span de cualquier traza es <code>order.create</code> con <code>service.name = order-service</code>. El atributo <code>http.route = /orders</code> confirma el endpoint de entrada. El timestamp del span indica el momento exacto de inicio.
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Cuál servicio tardó más?</div>
+  <div class="a">
+    En <strong>Jaeger</strong> (vista waterfall): comparar el ancho de la barra de <code>order-service: order.create</code> contra <code>kitchen-service: kitchen.check</code>. Normalmente kitchen-service tarda más porque hace 3 consultas a SQLite. En <strong>Grafana</strong>: panel "Latencia DB p95" muestra la latencia por operación.
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Cuál span falló?</div>
+  <div class="a">
+    En <strong>Jaeger</strong>: filtrar con tag <code>error=true</code>. El span <code>order.validate</code> falla cuando se envían ítems que no están en el menú (ej: "sushi", "tacos"). Aparece en color rojo y contiene el atributo <code>restaurant.unknown_items</code> con la lista de ítems inválidos.
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Qué operación generó latencia?</div>
+  <div class="a">
+    En <strong>Jaeger</strong> (waterfall): el span más ancho dentro de kitchen-service suele ser <code>kitchen.db.query_history</code> (consulta SQLite con WHERE sobre texto). En <strong>Grafana</strong>: panel "Latencia de Consultas DB p95" con el label <code>operation</code> identifica cuál de las 3 operaciones DB fue la más lenta.
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Cuántos requests por segundo existen?</div>
+  <div class="a">
+    En <strong>Grafana</strong>: panel "Requests por Segundo (RPS)" usando la query:<br>
+    <code>rate(restaurant_restaurant_orders_total_total[1m])</code><br>
+    Separado por label <code>status</code> (success vs failed).
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Cuál es el percentil p95?</div>
+  <div class="a">
+    En <strong>Grafana</strong>: panel "Latencia de Órdenes – Percentil p95" usando:<br>
+    <code>histogram_quantile(0.95, rate(restaurant_restaurant_order_duration_ms_bucket[5m]))</code><br>
+    Indica que el 95% de las órdenes responden en menos de ese tiempo. También se puede ver el p50 (mediana) en el mismo panel para comparar.
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Cuál servicio consume más memoria?</div>
+  <div class="a">
+    En <strong>Grafana</strong>: panel "Memoria del OTel Collector" con la métrica <code>otelcol_process_memory_rss</code>. Para los microservicios Python, el consumo de memoria está disponible en Prometheus mediante las métricas del proceso que FastAPI expone. El Collector generalmente consume más memoria al acumular el buffer de spans del batch processor.
+  </div>
+</div>
+
+<div class="answer-box">
+  <div class="q">¿Cuál endpoint tiene más errores?</div>
+  <div class="a">
+    En <strong>Grafana</strong>: panel "Tasa de Error (%)" con la query:<br>
+    <code>100 * sum(restaurant_orders_failed_total) / sum(restaurant_orders_total_total)</code><br>
+    En <strong>Jaeger</strong>: filtrar por <code>error=true</code> y observar cuál operation aparece más frecuentemente marcada como error. El endpoint <code>POST /orders</code> es el único que puede fallar cuando los ítems del pedido no existen en el menú.
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2>Resumen de Objetivos Cumplidos</h2>
+
+<table>
+  <tr><th>Objetivo del PDF</th><th>Implementación</th><th>Archivo</th></tr>
+  <tr><td>Instrumentación automática</td><td>FastAPIInstrumentor, HTTPXClientInstrumentor, SQLite3Instrumentor</td><td>main.py (ambos)</td></tr>
+  <tr><td>Instrumentación manual</td><td>7 spans con tracer.start_as_current_span()</td><td>main.py (ambos)</td></tr>
+  <tr><td>Propagación de contexto</td><td>W3C TraceContext via HTTPXClientInstrumentor</td><td>order-service/main.py</td></tr>
+  <tr><td>Correlación logs-traces</td><td>LoggingInstrumentor con trace_id y span_id</td><td>main.py (ambos)</td></tr>
+  <tr><td>Métricas HTTP</td><td>Counter, Histogram, UpDownCounter</td><td>main.py (ambos)</td></tr>
+  <tr><td>Exportación OTLP</td><td>OTLPSpanExporter + OTLPMetricExporter vía gRPC</td><td>main.py (ambos)</td></tr>
+  <tr><td>Collector funcionando</td><td>otel-collector-contrib con 3 pipelines</td><td>otel-collector-config.yaml</td></tr>
+  <tr><td>Visualización Jaeger</td><td>Trazas distribuidas con waterfall completo</td><td>docker-compose.yml</td></tr>
+  <tr><td>Visualización Grafana</td><td>Dashboard con 12 paneles auto-provisionado</td><td>grafana/dashboards/</td></tr>
+  <tr><td>Manejo de errores</td><td>record_exception + StatusCode.ERROR en todos los catch</td><td>main.py (ambos)</td></tr>
+  <tr><td>Buenas prácticas SRE</td><td>Batch async, memory_limiter, health checks, recursos declarados</td><td>Todos los archivos</td></tr>
+  <tr><td>Métrica custom</td><td>restaurant.order.value + restaurant.kitchen.dish_requests</td><td>main.py (ambos)</td></tr>
+  <tr><td>Collector asíncrono</td><td>BatchSpanProcessor + batch processor en Collector</td><td>main.py + collector config</td></tr>
+</table>
+
+<br>
+<div class="callout green" style="text-align:center;font-size:11pt;">
+  Para guardar como PDF: <strong>Ctrl + P</strong> en el navegador → <strong>Guardar como PDF</strong>
+</div>
+
+</div>
+</body>
+</html>

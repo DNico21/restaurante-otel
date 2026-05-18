@@ -5,7 +5,7 @@
   "tags": ["restaurant", "opentelemetry", "sre"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": { "from": "now-30m", "to": "now" },
   "panels": [
@@ -16,9 +16,9 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(restaurant_restaurant_orders_total_total[1m])",
-          "legendFormat": "RPS - {{status}}"
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "rate(restaurant_restaurant_orders_total[1m])",
+          "legendFormat": "RPS total"
         }
       ],
       "fieldConfig": {
@@ -35,13 +35,13 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "histogram_quantile(0.95, rate(restaurant_restaurant_order_duration_ms_bucket[5m]))",
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "histogram_quantile(0.95, rate(restaurant_restaurant_order_duration_milliseconds_bucket[5m]))",
           "legendFormat": "p95 latency"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "histogram_quantile(0.50, rate(restaurant_restaurant_order_duration_ms_bucket[5m]))",
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "histogram_quantile(0.50, rate(restaurant_restaurant_order_duration_milliseconds_bucket[5m]))",
           "legendFormat": "p50 latency"
         }
       ],
@@ -59,8 +59,8 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "sum(restaurant_restaurant_orders_total_total)",
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "sum(restaurant_restaurant_orders_total)",
           "legendFormat": "Total"
         }
       ],
@@ -77,7 +77,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "sum(restaurant_restaurant_orders_failed_total)",
           "legendFormat": "Fallidas"
         }
@@ -103,8 +103,8 @@
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "100 * sum(restaurant_restaurant_orders_failed_total) / (sum(restaurant_restaurant_orders_total_total) > 0)",
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "100 * sum(restaurant_restaurant_orders_failed_total) / (sum(restaurant_restaurant_orders_total) > 0)",
           "legendFormat": "Error Rate"
         }
       ],
@@ -129,8 +129,8 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "sum(restaurant_restaurant_orders_active_total)",
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "sum(restaurant_restaurant_orders_active)",
           "legendFormat": "Activas"
         }
       ],
@@ -148,12 +148,12 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "histogram_quantile(0.95, rate(restaurant_restaurant_order_value_COP_bucket[5m]))",
           "legendFormat": "p95 valor orden (COP)"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "rate(restaurant_restaurant_order_value_COP_sum[1m]) / rate(restaurant_restaurant_order_value_COP_count[1m])",
           "legendFormat": "Valor promedio por orden (COP)"
         }
@@ -173,7 +173,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "sum by (dish) (restaurant_restaurant_kitchen_dish_requests_total)",
           "legendFormat": "{{dish}}"
         }
@@ -196,8 +196,8 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "histogram_quantile(0.95, rate(restaurant_restaurant_kitchen_db_query_duration_ms_bucket[5m]))",
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
+          "expr": "histogram_quantile(0.95, rate(restaurant_restaurant_kitchen_db_query_duration_milliseconds_bucket[5m]))",
           "legendFormat": "p95 DB latency - {{operation}}"
         }
       ],
@@ -212,7 +212,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "rate(restaurant_restaurant_kitchen_db_queries_total[1m])",
           "legendFormat": "{{operation}}"
         }
@@ -228,7 +228,7 @@
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 28 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "rate(restaurant_restaurant_kitchen_errors_total[1m])",
           "legendFormat": "Errores/s - {{operation}}"
         }
@@ -247,7 +247,7 @@
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 28 },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-uid" },
           "expr": "otelcol_process_memory_rss",
           "legendFormat": "OTel Collector RSS"
         }
@@ -257,14 +257,5 @@
       }
     }
   ],
-  "templating": {
-    "list": [
-      {
-        "name": "DS_PROMETHEUS",
-        "type": "datasource",
-        "pluginId": "prometheus",
-        "current": { "text": "Prometheus", "value": "Prometheus" }
-      }
-    ]
-  }
+  "templating": { "list": [] }
 }

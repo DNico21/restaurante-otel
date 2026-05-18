@@ -13,7 +13,7 @@ receivers:
         - job_name: "otel-collector"
           scrape_interval: 10s
           static_configs:
-            - targets: ["0.0.0.0:8888"]
+            - targets: ["localhost:8888"]
 
 processors:
   # Batch asíncrono: agrupa spans/metrics/logs antes de exportar
@@ -57,11 +57,8 @@ exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
     namespace: "restaurant"
-    const_labels:
-      environment: "development"
     send_timestamps: true
     metric_expiration: 180m
-    enable_open_metrics: true
     resource_to_telemetry_conversion:
       enabled: true
 
